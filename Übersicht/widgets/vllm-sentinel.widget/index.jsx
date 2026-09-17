@@ -40,7 +40,7 @@
 
 // ===== 可配置 =====
 const SERVER = "http://你的服务器IP:8889"   // vLLM Sentinel 控制台地址
-const REFRESH_MS = 1000                        // 刷新间隔（v81：2000→1000ms，摆动步长减半更流畅）
+const REFRESH_MS = 500                        // v91：1000→500ms——摆动离散跳步 2.9°→1.45°/帧更流畅（用户：动画更流畅点）
 const HOT_TEMP = 75                           // >= 此温度变红（GPU 负载条 + CPU 温度）
 const OTHER_W = 200                            // 整机功耗估算的"其他"补偿值
 const PSU = "2600 + 2200 W"                    // 电源额定
@@ -160,7 +160,7 @@ const ISO_PITCH = 10 * Math.PI / 180
 // v82：摆动中心 -34°→-38°（左壁 52→58px 更宽，后面立体面加宽），幅度 ±8° 保持
 const ISO_YAW_BASE = -38 * Math.PI / 180   // 摆动中心（-38° 左壁更宽）
 const SWING_AMP = 12 * Math.PI / 180        // v87 幅度 ±12°（-26°↔-50°，用户：转动幅度大一点）
-const SWING_PERIOD = 26000                 // v87 26s 一个来回（更慢更流畅，用户：流畅一点）
+const SWING_PERIOD = 32000                 // v91：26s→32s——角速度 2.9→2.36°/s，配合 500ms 刷新步长 1.18°/帧（用户：动画更流畅点）
 const spinYaw = function () {
   if (!SWING_AMP) return ISO_YAW
   return ISO_YAW_BASE + SWING_AMP * Math.sin(2 * Math.PI * (Date.now() % SWING_PERIOD) / SWING_PERIOD)
@@ -769,6 +769,9 @@ export const render = ({ output }) => {
                     <linearGradient id="rgbStrip" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#4e9cff" /><stop offset=".5" stop-color="#a78bfa" /><stop offset="1" stop-color="#f472b6" /></linearGradient>
                     {/* v70 后板立体面：渐变 + 网孔 + 受光层次 */}
                     <linearGradient id="faceRear" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#131b2a" stop-opacity=".99" /><stop offset=".5" stop-color="#1c2636" stop-opacity=".98" /><stop offset="1" stop-color="#0b1220" stop-opacity=".99" /></linearGradient>
+                    {/* v91 逼真化：钢化玻璃斜向反光带 + 机箱落地软阴影 */}
+                    <linearGradient id="glassBand" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ffffff" stop-opacity="0" /><stop offset=".35" stop-color="#cfe0ff" stop-opacity=".10" /><stop offset=".5" stop-color="#ffffff" stop-opacity=".16" /><stop offset=".65" stop-color="#cfe0ff" stop-opacity=".10" /><stop offset="1" stop-color="#ffffff" stop-opacity="0" /></linearGradient>
+                    <radialGradient id="caseShadow" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#000000" stop-opacity=".5" /><stop offset=".7" stop-color="#000000" stop-opacity=".22" /><stop offset="1" stop-color="#000000" stop-opacity="0" /></radialGradient>
                   </defs>
                   {/* v78 水平旋转：面按深度排序绘制（painter's algorithm，z1 小=远先画），
                       旋转到任何角度遮挡都正确；各面细节跟所属面一组 */}
@@ -786,9 +789,11 @@ export const render = ({ output }) => {
                       pts.forEach(function (p) { sum += (p[2] || 0) })
                       return sum / pts.length
                     }
-                    // —— 底座组（BASE_T + BASE_SE + 支脚 + 收边高光） ——
+                    // —— 底座组（BASE_T + BASE_SE + 支脚 + 收边高光 + 落地软阴影） ——
                     faces.push({ z: -300, el: (
                       <g key="g-base">
+                        {/* v91 机箱落地软阴影（椭圆径向渐变，投在底座下沿） */}
+                        <ellipse cx={pj(0, CH + 9, 0)[0].toFixed(1)} cy={pj(0, CH + 9, 0)[1].toFixed(1)} rx="150" ry="14" fill="url(#caseShadow)" />
                         <polygon points={poly(BOX.BASE_T)} fill="#141a24" stroke="#4a5462" strokeWidth="1" />
                         <polygon points={poly(BOX.BASE_SE)} fill="#0c1018" stroke="#3a4450" strokeWidth="1" />
                         {/* ⑥ 底座支脚（实体图四角小垫脚） */}
@@ -817,6 +822,9 @@ export const render = ({ output }) => {
                         <polygon points={poly([pj(-155, 0, -55), pj(-115, 0, -55), pj(-115, CH, -55), pj(-155, CH, -55)])} fill="#04070d" opacity=".55" />
                         <polygon points={poly([pj(-115, 0, -55), pj(-40, 0, -55), pj(-40, CH, -55), pj(-115, CH, -55)])} fill="#04070d" opacity=".3" />
                         <polygon points={poly([pj(-157, 0, -55), pj(-153, 0, -55), pj(-153, CH, -55), pj(-157, CH, -55)])} fill="#02050b" opacity=".8" />
+                        {/* v91 钢化玻璃斜向反光带（烟熏玻璃面板的高光扫过感） */}
+                        <polygon points={poly([pj(-60, 0, -55), pj(-30, 0, -55), pj(-45, CH, -55), pj(-75, CH, -55)])} fill="url(#glassBand)" opacity=".8" />
+                        <polygon points={poly([pj(30, 0, -55), pj(48, 0, -55), pj(30, CH, -55), pj(12, CH, -55)])} fill="url(#glassBand)" opacity=".5" />
                       </g>
                     ) })
                     // —— 前面板组（F z=+55：面 + 全部前面板细节） ——
@@ -870,6 +878,12 @@ export const render = ({ output }) => {
                         {[[-150, 48], [-52, 46], [46, 44]].map(function (seg, ti) {
                           return <polygon key={"lid" + ti} points={poly([pj(seg[0], 0, seg[1]), pj(seg[0] + 92, 0, seg[1]), pj(seg[0] + 92, 0, seg[1] - 10), pj(seg[0], 0, seg[1] - 10)])} fill="url(#aluTrim)" stroke="#7a8696" strokeWidth="0.6" />
                         })}
+                        {/* v91 顶盖拉丝细纹（每段 4 条顺铝纹方向的细高光线） */}
+                        {[[-150, 48], [-52, 46], [46, 44]].map(function (seg, ti) {
+                          return [1.5, 3.5, 5, 6.5].map(function (dy, li) {
+                            return <line key={"brush" + ti + "-" + li} x1={pj(seg[0] + 3, 0, seg[1] - dy)[0].toFixed(1)} y1={pj(seg[0] + 3, 0, seg[1] - dy)[1].toFixed(1)} x2={pj(seg[0] + 89, 0, seg[1] - dy)[0].toFixed(1)} y2={pj(seg[0] + 89, 0, seg[1] - dy)[1].toFixed(1)} stroke="#9fb0c8" strokeWidth="0.35" opacity=".28" />
+                          })
+                        })}
                         {/* ② 顶盖前缘 RGB 光带 */}
                         <polygon points={poly([pj(-150, 0, 52), pj(150, 0, 52), pj(150, 0, 55), pj(-150, 0, 55)])} fill="url(#rgbStrip)" opacity=".55" />
                         {/* ⑩ 顶面上方边缘高光 */}
@@ -902,6 +916,15 @@ export const render = ({ output }) => {
                         <text key={"cardno" + i2} x={pj(132, s2.y + 3, SLAB_Z)[0] + 8} y={pj(132, s2.y + 3, SLAB_Z)[1] + 2.5} textAnchor="start" fontSize="7" fontWeight="700" fill={s2.hot ? "#fca5a5" : "#8ba3ff"} stroke="#0d1828" strokeWidth="0.4" paintOrder="stroke" fontFamily="'JetBrains Mono','SF Mono',monospace">{s2.idx}</text>
                       ) })
                     })
+                    // v91 PCIe 插槽提示（卡条堆底部 y=151 之下的插槽托架小块，金属质感）
+                    faces.push({ z: -45, el: (
+                      <g key="pcie">
+                        {[0, 1, 2, 3, 4].map(function (pi) {
+                          const py0 = 153 + pi * 2.2
+                          return <rect key={"pcie" + pi} x={pj(SLAB_L + 8, py0, SLAB_Z)[0].toFixed(1)} y={pj(SLAB_L + 8, py0, SLAB_Z)[1].toFixed(1)} width="42" height="1.2" fill="#2a3648" stroke="#4a5a72" strokeWidth="0.3" opacity=".65" transform={`rotate(${(squashAngle(0, 0, 1) * 180 / Math.PI).toFixed(1)} ${pj(SLAB_L + 8, py0, SLAB_Z)[0].toFixed(1)} ${pj(SLAB_L + 8, py0, SLAB_Z)[1].toFixed(1)})`} />
+                        })}
+                      </g>
+                    ) })
                     // —— 机箱扇 + 9733（v86：顶/后凹槽块整体删除——凹槽深色填充 #03060c
                     //     比扇椭圆大，在扇周围露出黑圈（用户：又一圈黑色的去掉）；
                     //     扇直接画在所属面上，黑圈消失） ——
