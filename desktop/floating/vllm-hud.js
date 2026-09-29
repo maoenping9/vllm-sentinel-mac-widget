@@ -26,8 +26,8 @@ panel.setHidesOnDeactivate(false);
 // webview: addSubview FIRST, then load (wrong order = blank webview)
 const web = $.WKWebView.alloc.initWithFrame($.NSMakeRect(0, 0, W, H));
 panel.contentView.addSubview(web);
-const url = $.NSURL.fileURLWithPath('/tmp/vllm-monitor/vllm-monitor.html');
-const dir = $.NSURL.fileURLWithPath('/tmp/vllm-monitor/');
+const url = $.NSURL.fileURLWithPath('/Users/maoenping/Desktop/vllm-monitor/vllm-monitor.html');
+const dir = $.NSURL.fileURLWithPath('/Users/maoenping/Desktop/vllm-monitor/');
 const nav = web.loadFileURLAllowingReadAccessToURL(url, dir);
 console.log('loadFileURL:', nav ? 'ok' : 'NIL');
 panel.orderFront($());
